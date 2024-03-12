@@ -67,21 +67,16 @@ const addBookHandler = (request, h) => {
 };
 
 const getBookHandler = (request, h) => {
-  const bookId = request.params.bookId ? request.params.bookId : null;
+  const bookId = request.params.bookId ?? null;
 
   if (bookId !== null) {
     const searchBook = (bookId) => {
-      books.forEach((book) => {
-        if (book.id == bookId) return book;
-      });
-
-      return null;
+      return books.find((book) => book.id === bookId);
     };
 
     const book = searchBook(bookId);
-    console.log(book);
 
-    if (book === null) {
+    if (book === undefined) {
       const response = h.response({
         status: "fail",
         message: "Buku tidak ditemukan",
@@ -110,16 +105,27 @@ const getBookHandler = (request, h) => {
     };
   };
 
-  const searchedBooks = [];
+  const reading = request.query.reading ?? null;
+  const finished = request.query.finished ?? null;
+  const name = request.query.name ?? null;
 
-  books.forEach((book) => {
-    searchedBooks.push(createBookDetail(book));
-  });
+  var searchedBooks = books;
+  searchedBooks = reading
+    ? searchedBooks.filter((book) => book.reading == reading)
+    : searchedBooks;
+  searchedBooks = finished
+    ? searchedBooks.filter((book) => book.finished == finished)
+    : searchedBooks;
+  searchedBooks = name
+    ? searchedBooks.filter((book) => book.name.toLowerCase().includes(name.toLowerCase()))
+    : searchedBooks;
+
+  var responseBooks = searchedBooks.map((book) => createBookDetail(book));
 
   const response = h.response({
     status: "success",
     data: {
-      books: searchedBooks,
+      books: responseBooks,
     },
   });
   response.code(200);
@@ -140,7 +146,8 @@ const editBookHandler = (request, h) => {
   } = request.payload;
 
   const validate = (name, pageCount, readPage) => {
-    if (name === null) return "Gagal memperbarui buku. Mohon isi nama buku";
+    if (name === undefined)
+      return "Gagal memperbarui buku. Mohon isi nama buku";
     if (readPage > pageCount)
       return "Gagal memperbarui buku. readPage tidak boleh lebih besar dari pageCount";
     return null;
@@ -161,22 +168,26 @@ const editBookHandler = (request, h) => {
   const bookId = request.params.bookId;
 
   const searchAndEditBook = (bookId) => {
-    books.forEach((book) => {
-      if (book.id === bookId) {
-        book.year = year;
-        book.author = author;
-        book.summary = summary;
-        book.publisher = publisher;
-        book.pageCount = pageCount;
-        book.readPage = readPage;
-        book.reading = reading;
-        book.updatedAt = new Date().toISOString();
+    const index = books.findIndex((book) => book.id === bookId);
 
-        return book;
-      }
-    });
+    if (index === -1) return null;
 
-    return null;
+    var book = books[index];
+
+    book.name = name ?? book.name;
+    book.year = year ?? book.year;
+    book.author = author ?? book.author;
+    book.summary = summary ?? book.summary;
+    book.publisher = publisher ?? book.publisher;
+    book.pageCount = pageCount ?? book.pageCount;
+    book.readPage = readPage ?? book.readPage;
+    book.reading = reading ?? book.reading;
+    book.finished = (pageCount && pageCount === readPage) ?? book.finished; // Ensure pageCount exists
+    book.updatedAt = new Date().toISOString();
+
+    books[index] = book;
+
+    return book;
   };
 
   const found = searchAndEditBook(bookId);
@@ -204,15 +215,13 @@ const deleteBookHandler = (request, h) => {
   const bookId = request.params.bookId;
 
   const searchAndDeleteBook = (bookId) => {
-    books.forEach((book, index) => {
-      if (book.id === bookId) {
-        books.splice(index, 1);
+    const index = books.findIndex((book) => book.id === bookId);
 
-        return true;
-      }
-    });
+    if (index === -1) return null;
 
-    return null;
+    books.splice(index, 1);
+
+    return index;
   };
 
   const found = searchAndDeleteBook(bookId);
